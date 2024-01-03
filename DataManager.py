@@ -1,21 +1,17 @@
-import collections
 from tkinter import  *
 from tkinter import  ttk
 from tkinter import messagebox
-
 import  sqlite3
 import time
-from typing import Collection
-
-with sqlite3.connect('Base_de_Datos/DataBase.db') as db:
-    cursor = db.cursor()
+from DBManager import Database as DB
+from ItemEdit import General
 
 #SECCIONES
-
 def Data_Window():
-   
+    
+    db = DB()
     Options = ['Productos','Empleados','Registro']
-    Sections_All = ['Cocteles', 'Bebidas','Platillos','Caldos','Pescados','Postres']
+    #Sections_All = ['Cocteles', 'Bebidas','Platillos','Caldos','Pescados','Postres']
     
     #FUNCIONES
     def on_closing():
@@ -32,126 +28,122 @@ def Data_Window():
                 pass
             count +=1
     
-    def Change_Section(event):
-        Lectura = Product_items.get_children()
-        veces = TimePress.get()
-        Labelframetype = Section.get()  
-
-        if event == 1:
-            veces = veces + 1
-            if veces >= 0 and veces <= 5:
-                TimePress.set(veces)
-                Section.set(Sections_All[veces])
-        else:
-            if veces > 0:
-                veces = veces - 1 
-                TimePress.set(veces)
-                Section.set(Sections_All[veces])
-        if Section.get() == 'Cocteles':
-            Product_items.delete(*Lectura)
-            cursor.execute("SELECT id, Nombre, Precio FROM COCTELES")
-            rows = cursor.fetchall()
-            for x in rows:
-                Product_items.insert("", END, values=x)
-
-        elif Section.get() == 'Platillos':
-            Product_items.delete(*Lectura)
-            cursor.execute("SELECT id, Nombre, Precio FROM PLATILLOS")
-            rows = cursor.fetchall()
-            for x in rows:
-                Product_items.insert("", END, values=x)
-            pass
-        elif Section.get() == 'Caldos':
-            Product_items.delete(*Lectura)
-            cursor.execute("SELECT id, Nombre, Precio FROM CALDOS")
-            rows = cursor.fetchall()
-            for x in rows:
-                Product_items.insert("", END, values=x)
-            pass
-        elif Section.get() == 'Pescados':
-            Product_items.delete(*Lectura)
-            cursor.execute("SELECT id, Nombre, Precio FROM PESCADOS")
-            rows = cursor.fetchall()
-            for x in rows:
-                Product_items.insert("", END, values=x)
-            pass
-        elif Section.get() == 'Postres':
-            Product_items.delete(*Lectura)
-            cursor.execute("SELECT id, Nombre, Precio FROM POSTRES")
-            rows = cursor.fetchall()
-            for x in rows:
-                Product_items.insert("", END, values=x)
-            pass
-        else:
-            Product_items.delete(*Lectura)
-            cursor.execute("SELECT id, Nombre, Precio FROM BEBIDAS")
-            rows = cursor.fetchall()
-            for x in rows:
-                Product_items.insert("", END, values=x)
-            pass
-    
     def UpdateSearch_Product(event):
         Lectura = Product_items.get_children()
         Product_items.delete(*Lectura)
         for i in event:
             Product_items.insert("", END, values=i)
 
-    def Search_Product(section):
-        q = str(query.get())
+    def getrow(event, section):
+        match section:
+            case 'Departament':
+                DepartmentID = Department_Tvw.item(Department_Tvw.focus())['values'][0]
+                query_string = f"""
+                            SELECT ID, Description FROM Categories
+                            WHERE DepartmentID = '{DepartmentID}'
+                            """
+                categories_list = db.query(query_string)
+                update_treeview(Category_Tvw, categories_list,clean_lvl=1)
+            case 'Category':
+                CategoryID = Category_Tvw.item(Category_Tvw.focus())['values'][0]
+                query_string = f"""
+                            SELECT ID, Description, Weight FROM Products
+                            WHERE CatID = '{CategoryID}'
+                            """
+                products_list = db.query(query_string)
+                update_treeview(Product_Tvw, products_list,clean_lvl=2)
+            case 'Product':
+                ProductID = Product_Tvw.item(Product_Tvw.focus())['values'][0]
+                query_string = f"""
+                            SELECT ID, Description, Price FROM Variations
+                            WHERE ProductID = '{ProductID}'
+                            """
+                variations_list = db.query(query_string)
+                update_treeview(Variation_Tvw, variations_list,None)
+            case default:
+                pass
 
-        for row in Sections_All:
-            if row == section:
-                cursor.execute("SELECT * FROM " + row + " WHERE Nombre LIKE '%"+q+"%' OR Precio = ?",[q])
-                a = cursor.fetchall()
-        UpdateSearch_Product(a) 
-
-    def Clear_Product(section):
-        Entsearch.delete(0,END)
-        cursor.execute("SELECT * FROM " + section +" ")
-        rows = cursor.fetchall()
-        UpdateSearch_Product(rows)
-
-    def getrow(event):
-        rowid = Product_items.identify_row(event.y)
-        item = Product_items.item(Product_items.focus())
-        p_id.set(item['values'][0])
-        p_Name.set(item['values'][1])
-        p_Price.set(item['values'][2])
-
-    def Clear(section):
-        cursor.execute("SELECT * FROM " + section + " ")
-        Product_items.delete(*Product_items.get_children())
-        for i in cursor.fetchall():
-            Product_items.insert("",END, values = i)
-
-            EntID.delete(0, END)
-            EntName.delete(0, END)
-            EntPrice.delete(0, END)
+    def update_treeview(tree: ttk.Treeview, data: list, clean_lvl: int ) -> None:
+        tree.delete(*tree.get_children())
+        match clean_lvl:
+            case 1:
+                Product_Tvw.delete(*Product_Tvw.get_children())
+                Variation_Tvw.delete(*Variation_Tvw.get_children())
+            case 2:
+                Variation_Tvw.delete(*Variation_Tvw.get_children())
+            
+            case 3:
+                Entsearch.delete(0, END)
+            case default:
+                pass
+        for i in data:
+            tree.insert("", END, values=i)
         
-    def Delete_Product(section):
-        Productid = p_id.get()
-        if messagebox.askyesno('Eliminar Producto','¿Estás seguro de querer borrar este producto?'):
-            cursor.execute("DELETE FROM " + section +" WHERE id = ?", [Productid])
-            db.commit()
-            Clear(section)
-
-    def Add_Product(section):
-        Identidad = p_id.get()
-        Nombre = p_Name.get()
-        Precio = p_Price.get()
-        cursor.execute("INSERT INTO "+ section + " (id, Nombre, Precio) VALUES(?,?,?)",(Identidad,Nombre,Precio))
-        db.commit()
-        Clear(section)
-
-    def Update_Product(section):
-        Identidad = p_id.get()
-        Nombre = p_Name.get()
-        Precio = p_Price.get()
-
-        if messagebox.askyesno("CONFIRMAR", "¿Estás seguro de querer modificar este producto?"):
-            cursor.execute("UPDATE " + section + " SET Nombre = ?, Precio = ? WHERE id = ?", (Nombre, Precio, Identidad))
-            Clear(section)
-            db.commit()
+    def Delete_Item(section):
+        try:
+            DepartmentID = Department_Tvw.item(Department_Tvw.focus())['values'][0]
+        except:
+            messagebox.showerror('Error', 'No se ha seleccionado un departamento')
+            return
+        match section:
+            case 'Departament':
+                location = 'este departamento'
+                query_string = f"""
+                            DELETE FROM Departments
+                            WHERE ID = '{DepartmentID}'
+                            """
+                clear_lvl = 1
+                fill_string = f"""
+                            SELECT ID, Description FROM Departments
+                            """
+                treeview = Department_Tvw
+            case 'Category':
+                location = 'esta categoría'
+                CategoryID = Category_Tvw.item(Category_Tvw.focus())['values'][0]
+                query_string = f"""
+                            DELETE FROM Categories
+                            WHERE ID = '{CategoryID}'
+                            """
+                clear_lvl = 2
+                fill_string = f"""  
+                            SELECT ID, Description FROM Categories
+                            WHERE DepartmentID = '{DepartmentID}'
+                            """
+                treeview = Category_Tvw
+            case 'Product':
+                location = 'este producto'
+                CategoryID = Category_Tvw.item(Category_Tvw.focus())['values'][0]
+                ProductID = Product_Tvw.item(Product_Tvw.focus())['values'][0]
+                query_string = f"""
+                            DELETE FROM Products
+                            WHERE ID = '{ProductID}'
+                            """
+                clear_lvl = 3
+                fill_string = f"""
+                            SELECT ID, Description, Weight FROM Products
+                            WHERE CatID = '{CategoryID}'
+                            """ 
+                treeview = Product_Tvw
+            case 'Variation':
+                ProductID = Product_Tvw.item(Product_Tvw.focus())['values'][0]
+                location = 'esta variante'
+                VariationID = Variation_Tvw.item(Variation_Tvw.focus())['values'][0]
+                query_string = f"""
+                            DELETE FROM Variations
+                            WHERE ID = '{VariationID}'
+                            """
+                clear_lvl = None
+                fill_string = f"""
+                            SELECT ID, Description, Price FROM Variations
+                            WHERE ProductID = '{ProductID}'
+                            """
+                treeview = Variation_Tvw
+            case default:
+                pass
+        option = messagebox.askyesno(f"CONFIRMAR", f"¿Estás seguro de querer eliminar {location}?")
+        if option:
+            db.update(query_string)
+            update_treeview(treeview, db.query(fill_string),clean_lvl=clear_lvl)
         
     def Get_Employee(event):
         item = Employee_items.item(Employee_items.focus())
@@ -227,12 +219,375 @@ def Data_Window():
         BorrarEntry.delete(0,END)
         Update_Registro()
 
+    def modify_in_tree(branch: str, add: bool, values: list) -> None:
+        
+        match branch:
+            case 'Departamento':
+                New_name = values[0]
+                if add:
+                    query_string = f"""
+                        INSERT INTO Departments (Description)
+                        VALUES ('{New_name}')
+                        """
+                    mod = messagebox.askquestion('Agregar', '¿Estás seguro de querer agregar este departamento?')
+                    if not mod == 'yes':
+                        add_window.destroy()
+                        return
+
+                    db.update(query_string)
+                    update_treeview(Department_Tvw, db.query("SELECT * FROM Departments"),clean_lvl=1)
+                    add_window.destroy()
+                else:
+                    try:
+                        Old_name = Department_Tvw.item(Department_Tvw.focus())['values'][1]
+
+                        if Old_name == New_name:
+                            raise RuntimeError
+                            
+                    except:
+                        messagebox.showerror('Error', 'El nombre no ha cambiado')
+                        add_window.destroy()
+                        return
+                    try:
+                        DepartmentID = Department_Tvw.item(Department_Tvw.focus())['values'][0]
+                    except:
+                        messagebox.showerror('Error', 'No se ha seleccionado un departamento')
+                        return
+                    
+                    query_string = f"""
+                        UPDATE Departments
+                        SET Description = '{New_name}'
+                        WHERE ID = '{DepartmentID}'
+                        """
+                    mod = messagebox.askquestion('Modificar', '¿Estás seguro de querer modificar este departamento?')
+                    if not mod == 'yes':
+                        add_window.destroy()
+                        return
+
+                    db.update(query_string)
+                    update_treeview(Department_Tvw, db.query("SELECT * FROM Departments"),clean_lvl=1)
+                    add_window.destroy()
+            case 'Categoría':
+                New_name = values[0]
+                if add:
+                    try:
+                        DepartmentID = Department_Tvw.item(Department_Tvw.focus())['values'][0]
+                    except:
+                        messagebox.showerror('Error', 'No se ha seleccionado una categoría')
+                        return
+                    query_string = f"""
+                        INSERT INTO Categories (DepartmentID, Description)
+                        VALUES ('{DepartmentID}','{New_name}')
+                        """
+                    mod = messagebox.askquestion('Agregar', '¿Estás seguro de querer agregar esta categoría?')
+                    if not mod == 'yes':
+                        add_window.destroy()
+                        return
+
+                    db.update(query_string)
+                    update_treeview(Category_Tvw, db.query(f"SELECT ID, Description FROM Categories WHERE DepartmentID = {DepartmentID}"),clean_lvl=1)
+                    add_window.destroy()
+                else:
+                    try:
+                        Old_name = Category_Tvw.item(Category_Tvw.focus())['values'][1]
+                        DepartmentID = Department_Tvw.item(Department_Tvw.focus())['values'][0]
+                        if Old_name == New_name:
+                            raise RuntimeError
+                            
+                    except:
+                        messagebox.showerror('Error', 'El nombre no ha cambiado')
+                        add_window.destroy()
+                        return
+                    try:
+                        CategoryID = Category_Tvw.item(Category_Tvw.focus())['values'][0]
+                    except:
+                        messagebox.showerror('Error', 'No se ha seleccionado una categoría')
+                        add_window.destroy()
+                        return
+                    
+                    query_string = f"""
+                        UPDATE Categories
+                        SET Description = '{New_name}'
+                        WHERE ID = '{CategoryID}'
+                        """
+                    mod = messagebox.askquestion('Modificar', '¿Estás seguro de querer modificar esta categoría?')
+                    if not mod == 'yes':
+                        add_window.destroy()
+                        return
+
+                    db.update(query_string)
+                    update_treeview(Category_Tvw, db.query(f"SELECT ID, Description FROM Categories WHERE DepartmentID = '{DepartmentID}'"),clean_lvl=2)
+                    add_window.destroy()
+            case 'Producto':
+                New_name = values[0]
+                Weight = values[1] 
+                if add:
+                    try:
+                        CatID = Category_Tvw.item(Category_Tvw.focus())['values'][0]
+                    except:
+                        messagebox.showerror('Error', 'No se ha seleccionado un producto')
+                        return
+                    query_string = f"""
+                        INSERT INTO Products (CatID, Description, Weight)
+                        VALUES ('{CatID}','{New_name}', '{Weight}')
+                        """
+                    mod = messagebox.askquestion('Agregar', '¿Estás seguro de querer agregar este producto?')
+                    if not mod == 'yes':
+                        add_window.destroy()
+                        return
+
+                    db.update(query_string)
+                    update_treeview(Product_Tvw, db.query(f"SELECT ID, Description, Weight FROM Products WHERE CatID = '{CatID}'"),clean_lvl=2)
+                    add_window.destroy()
+                else:
+                    try:
+                        
+                        if Weight:
+                            Weight = 'True'
+                        else:
+                            Weight = 'False'
+
+                        Old_name = Product_Tvw.item(Product_Tvw.focus())['values'][1]
+                        Old_weight = Product_Tvw.item(Product_Tvw.focus())['values'][2]
+                        CategoryID = Category_Tvw.item(Category_Tvw.focus())['values'][0]
+
+                        if (Old_name == New_name and Old_weight == Weight):
+                            raise RuntimeError
+                            
+                    except:
+                        messagebox.showerror('Error', 'Ningún parámetro ha cambiado')
+                        add_window.destroy()
+                        return
+                    try:
+                        ProductID = Product_Tvw.item(Product_Tvw.focus())['values'][0]
+                    except:
+                        messagebox.showerror('Error', 'No se ha seleccionado un producto')
+                        add_window.destroy()
+                        return
+                    
+                    query_string = f"""
+                        UPDATE Products
+                        SET Description = '{New_name}', Weight = '{Weight}'
+                        WHERE ID = '{ProductID}'
+                        """
+                    mod = messagebox.askquestion('Modificar', '¿Estás seguro de querer modificar este producto?')
+                    if not mod == 'yes':
+                        add_window.destroy()
+                        return
+
+                    db.update(query_string)
+                    update_treeview(Product_Tvw, db.query(f"SELECT ID, Description, Weight FROM Products WHERE CatID = '{CategoryID}'"),clean_lvl=2)
+                    add_window.destroy()
+            case 'Variación':
+                New_name = values[0]
+                price = values[1]
+                if add:
+                    try:
+                        ProductID = Product_Tvw.item(Product_Tvw.focus())['values'][0]
+                        CatID = Category_Tvw.item(Category_Tvw.focus())['values'][0]
+                        DepartmentID = Department_Tvw.item(Department_Tvw.focus())['values'][0]
+
+                    except:
+                        messagebox.showerror('Error', 'No se ha seleccionado una variación')
+                        return
+                    query_string = f"""
+                        INSERT INTO Variations (DepartmentID, CatID, ProductID, Description, Price)
+                        VALUES ('{DepartmentID}','{CatID}','{ProductID}','{New_name}', '{price}')
+                        """
+                    mod = messagebox.askquestion('Agregar', '¿Estás seguro de querer agregar esta variación?')
+                    if not mod == 'yes':
+                        add_window.destroy()
+                        return
+
+                    db.update(query_string)
+                    update_treeview(Variation_Tvw, db.query(f"SELECT ID, Description, Price FROM Variations WHERE ProductID = '{ProductID}'"),clean_lvl=None)
+                    add_window.destroy()
+                else:
+                    try:
+                        Old_name = Variation_Tvw.item(Variation_Tvw.focus())['values'][1]
+                        Old_price = Variation_Tvw.item(Variation_Tvw.focus())['values'][2]
+                        ProductID = Product_Tvw.item(Product_Tvw.focus())['values'][0]
+                        if Old_name == New_name and Old_price == price:
+                            raise RuntimeError
+                            
+                    except:
+                        messagebox.showerror('Error', 'El nombre no ha cambiado')
+                        add_window.destroy()
+                        return
+                    try:
+                        VariationID = Variation_Tvw.item(Variation_Tvw.focus())['values'][0]
+                    except:
+                        messagebox.showerror('Error', 'No se ha seleccionado una variación')
+                        add_window.destroy()
+                        return
+                    
+                    query_string = f"""
+                        UPDATE Variations
+                        SET Description = '{New_name}', Price = '{price}'
+                        WHERE ID = '{VariationID}'
+                        """
+                    mod = messagebox.askquestion('Modificar', '¿Estás seguro de querer modificar esta variación?')
+                    if not mod == 'yes':
+                        add_window.destroy()
+                        return
+
+                    db.update(query_string)
+                    update_treeview(Variation_Tvw, db.query(f"SELECT ID, Description, Price FROM Variations WHERE ProductID = '{ProductID}'"),clean_lvl=None)
+                    add_window.destroy()
+            case default:
+                pass
+    
+    def Add_Item_window(Type: str, add: bool, weight: bool, price: bool) -> None:
+
+        global add_window 
+        add_window = Toplevel()
+        add_window.geometry('300x200')
+        add_window.config(bg = '#E9967A')
+        weight_boolean = BooleanVar()
+        weight_boolean.set(False)
+        price_value = DoubleVar()
+        price_value.set(0.0)
+
+        if add == True:
+            add_window.title(f'Agregar {Type}')
+        else:
+            add_window.title(f'Modificar {Type}')
+
+        if price:
+            text = f'Nombre {Type} y precio'
+        else:
+            text = f'Nombre {Type}'
+
+        Name_label = Label(add_window, text = text)
+        Name_label.config(bg = '#E9967A', font = 'Arial 14 bold')
+        Name_label.pack(pady = 10)
+
+    
+        Body_frame = Frame(add_window)
+        Body_frame.config(bg = '#E9967A')
+        Body_frame.pack(anchor=CENTER, pady = 10)
+
+        if price:
+            Name_entry = Entry(Body_frame)
+            Name_entry.config(justify = 'center', bd = 3, relief = SUNKEN, width=20)
+            Name_entry.grid(row = 0, column = 0, padx = 10, pady = 10)
+
+            Price_entry = Entry(Body_frame, textvariable = price_value)
+            Price_entry.config(justify = 'center', bd = 3, relief = SUNKEN, width=10)
+            Price_entry.grid(row = 0, column = 1, padx = 10, pady = 10)
+            
+        else:
+            Name_entry = Entry(Body_frame)
+            Name_entry.config(justify = 'center', bd = 3, relief = SUNKEN, width=30)
+            Name_entry.grid(row = 0, column = 0, padx = 10, pady = 10)
+
+        if not add:
+            try:
+                match Type:
+                    case 'Departamento':
+                        Name_entry.insert(0, Department_Tvw.item(Department_Tvw.focus())['values'][1])
+                    case 'Categoría':
+                        Name_entry.insert(0, Category_Tvw.item(Category_Tvw.focus())['values'][1])
+                    case 'Producto':
+                        Name_entry.insert(0, Product_Tvw.item(Product_Tvw.focus())['values'][1])
+                        if weight:
+                            weight_value = Product_Tvw.item(Product_Tvw.focus())['values'][2]
+                            if weight_value == 'True':
+                                weight_boolean.set(True)
+                            else:   
+                                weight_boolean.set(False)
+
+                            print(weight_boolean.get(), type(weight_boolean.get()))
+                    case 'Variación':
+                        Name_entry.insert(0, Variation_Tvw.item(Variation_Tvw.focus())['values'][1])
+                        if price:
+                            price_value.set(Variation_Tvw.item(Variation_Tvw.focus())['values'][2])
+                    case default:
+                        pass
+            except:
+                messagebox.showerror('Error', 'No se ha seleccionado un departamento')
+                add_window.destroy()
+                return
+
+        if weight == True:
+            weight_frame = Frame(add_window)
+            weight_frame.config(bg = '#E9967A')
+            weight_frame.pack(pady = 10)
+
+            weight_label = Label(weight_frame, text = 'Peso')
+            weight_label.config(bg = '#E9967A', font = 'Arial 14 bold')
+            weight_label.pack(side = LEFT)
+
+            weight_check = Checkbutton(weight_frame, var = weight_boolean)
+            weight_check.config(bg = '#E9967A')
+            weight_check.pack(side = LEFT)
+
+            Command = lambda: modify_in_tree(Type, add, [Name_entry.get(), weight_boolean.get()])
+
+        else:
+            Command = lambda: modify_in_tree(Type, add, [Name_entry.get()])
+            if price:
+                Command = lambda: modify_in_tree(Type, add, [Name_entry.get(), price_value.get()])
+        Button_frame = Frame(add_window)
+        Button_frame.config(bg = '#E9967A')
+        Button_frame.pack(pady = 10)
+
+        if add == True:
+            Add_button = Button(Button_frame, text = 'Agregar', command= Command)
+            Add_button.config(width = 20)
+            Add_button.pack(side = 'left', padx = 10)
+        else:
+            Update_button = Button(Button_frame, text = 'Modificar', command= Command)
+            Update_button.config(width = 20)
+            Update_button.pack(side = 'left', padx = 10)
+
+        Cancel_button = Button(Button_frame, text = 'Cancelar', command = add_window.destroy)
+        Cancel_button.config(width = 20)
+        Cancel_button.pack(side = LEFT, padx = 10)
+
+        add_window.protocol("WM_DELETE_WINDOW", add_window.destroy)
+    
+    def Search(args, ID, searchbox):
+
+        if searchbox:
+            search_option = f"Prod.Description like '%{ID}%'"
+            pass
+        else:
+            search_option = f"Var.ID = {ID}"
+            pass
+        try:
+            fill_variation_query_string = f"""
+                SELECT Var.ID, 
+                    Dep.Description,
+                    Cat.Description,
+                    Prod.Description,
+                    Var.Description,
+                    Var.Price	
+                FROM
+                Variations as Var
+                JOIN Departments  as Dep
+                ON Dep.ID = Var.DepartmentID
+                JOIN Categories as Cat 
+                ON Cat.ID = Var.CatID
+                JOIN Products as Prod
+                ON Prod.ID = Var.ProductID 
+                WHERE {search_option}
+                """
+            if searchbox:
+                items = db.query(fill_variation_query_string)
+                update_treeview(Items_Tvw, items,clean_lvl=3)
+            else:
+                item = db.query(fill_variation_query_string)[0]
+                update_treeview(Items_Tvw, [item],clean_lvl=None)
+            return
+        except:
+            return
     ######################################
 
     DataWn = Toplevel()
 
-    winy = DataWn.winfo_screenheight() * (600/768)
-    winx = DataWn.winfo_screenwidth() * (700/1366)
+    winy = DataWn.winfo_screenheight() * 0.8
+    winx = DataWn.winfo_screenwidth() * 0.5
 
     dy = 600
     dx = 700
@@ -243,6 +598,7 @@ def Data_Window():
 
     TimePress = IntVar()
     TimePress.set(0)
+
     #ETIQUETAS
     var = StringVar()
     var.set(Options[2])
@@ -255,120 +611,160 @@ def Data_Window():
     Frame_Product.config(bg = '#E9967A')
     Frame_Product.place(relx = 0, rely = 50/dy, relwidth = 1, relheight = 1)
 
-    ## Secciones del frame productos
-
-    Frame_Seccion1 = Frame(Frame_Product)  #Cambiador de listas
-    Frame_Seccion1.config(bg = '#E9967A')
-    Frame_Seccion1.place(relx=0.38, y = 0)
-
     Frame_Seccion3 = Frame(Frame_Product)  #Sección de edición
     Frame_Seccion3.config(bg = '#E9967A')
     Frame_Seccion3.place(x= 0, rely=0.5,relwidth=1,relheight=1)
-    ### FRAME SECCIÓN 1:
-    LeftButton = Button(Frame_Seccion1, text = '<', command = lambda : Change_Section(0))
-    LeftButton.grid(row=0,column=0)
-    #LeftButton.place(relx = 222/dx, rely = 13/dy)
 
-    Section = StringVar(Frame_Product)
-    Section.set(Sections_All[0]) 
-    Section.trace('w',Change_Section)
-    Sect = Label(Frame_Seccion1, textvariable = Section)
-    Sect.config(bg = "#E9967A",bd = 2, relief = SUNKEN, font = 'Arial 18 bold',width=10)
-    Sect.grid(row=0, column=1)
-
-    Right_Button = Button(Frame_Seccion1, text = '>', command = lambda : Change_Section(1))
-    Right_Button.grid(row=0,column=2)
 
     ##LABEL FRAMES IN PRODUCTS
  
     ###LISTAS
-    Product_items = ttk.Treeview(Frame_Product, columns=(1,2,3),show='headings')
-    Product_items.place(relx=0,rely=50/dy, relwidth=1,relheight=0.4)
-    Product_items.column(1, width=25)
-    Product_items.column(2, width=180)
-    Product_items.column(3, width= 30)
-    Product_items.heading(1, text = 'id')
-    Product_items.heading(2, text = 'Nombre')
-    Product_items.heading(3, text = 'Precio')
-    Product_items.bind('<Double 1>',getrow)
+    Frame_buttons1 = Frame(Frame_Product)
+    Frame_buttons1.config(bg = '#E9967A')
+    Frame_buttons1.place(relx = 0.15, rely = 0.01, relwidth = 0.15, relheight = 0.05)
 
-    cursor.execute("SELECT id, Nombre, Precio FROM COCTELES")
-    rows = cursor.fetchall()
-    for x in rows:
-        Product_items.insert("", END, values=x)
+    plus_button1 = Button(Frame_buttons1, text= '+', fg= 'green', command= lambda: Add_Item_window('Departamento', True, False, False))
+    plus_button1.pack(side = LEFT, padx = 2)
+    minus_button1 = Button(Frame_buttons1, text= '-', fg= 'red', command= lambda: Delete_Item('Departament'))
+    minus_button1.pack(side = LEFT, padx = 2)
+    edit_button1 = Button(Frame_buttons1, text= 'Editar', fg= 'blue', command= lambda: Add_Item_window('Departamento', False, False, False))
+    edit_button1.pack(side = LEFT, padx = 2)    
+
+    Department_Tvw = ttk.Treeview(Frame_Product, columns=(1,2),show='headings')
+    Department_Tvw.place(relx=0.1,rely=0.05, relwidth=0.25,relheight=0.15)
+    Department_Tvw.column(1, width=25)
+    Department_Tvw.column(2, width=180)
+    Department_Tvw.heading(1, text = 'ID')
+    Department_Tvw.heading(2, text = 'Departamento')
+    Department_Tvw.bind('<Double 1>',lambda x: getrow(x, 'Departament'))
+
+    for i in db.query("SELECT * FROM Departments"):
+        Department_Tvw.insert("",END, values = i)
+
+    Frame_buttons2 = Frame(Frame_Product)
+    Frame_buttons2.config(bg = '#E9967A')
+    Frame_buttons2.place(relx = 0.15, rely = 0.21, relwidth = 0.15, relheight = 0.05)
+
+    plus_button2 = Button(Frame_buttons2, text= '+', fg= 'green', command= lambda: Add_Item_window('Categoría', True, False, False))
+    plus_button2.pack(side = LEFT, padx = 2)
+    minus_button2 = Button(Frame_buttons2, text= '-', fg= 'red', command= lambda: Delete_Item('Category'))
+    minus_button2.pack(side = LEFT, padx = 2)
+    edit_button2 = Button(Frame_buttons2, text= 'Editar', fg= 'blue', command= lambda: Add_Item_window('Categoría', False, False, False)) 
+    edit_button2.pack(side = LEFT, padx = 2)
+
+    Category_Tvw = ttk.Treeview(Frame_Product, columns=(1,2),show='headings')
+    Category_Tvw.place(relx=0.1,rely=0.25, relwidth=0.25,relheight=0.2)
+    Category_Tvw.column(1, width=25)
+    Category_Tvw.column(2, width=180)
+    Category_Tvw.heading(1, text = 'ID')
+    Category_Tvw.heading(2, text = 'Categoría')
+    Category_Tvw.bind('<Double 1>',lambda x: getrow(x, 'Category'))
+
+    Frame_buttons3 = Frame(Frame_Product)
+    Frame_buttons3.config(bg = '#E9967A')
+    Frame_buttons3.place(relx = 0.45, rely = 0.01, relwidth = 0.15, relheight = 0.05)
+
+    plus_button3 = Button(Frame_buttons3, text= '+', fg= 'green', command= lambda: Add_Item_window('Producto', True, True, False))
+    plus_button3.pack(side = LEFT, padx = 2)
+    minus_button3 = Button(Frame_buttons3, text= '-', fg= 'red', command= lambda: Delete_Item('Product'))
+    minus_button3.pack(side = LEFT, padx = 2)
+    edit_button3 = Button(Frame_buttons3, text= 'Editar', fg= 'blue', command= lambda: Add_Item_window('Producto', False, True, False))
+    edit_button3.pack(side = LEFT, padx = 2)
+
+    Product_Tvw = ttk.Treeview(Frame_Product, columns=(1,2,3),show='headings')
+    Product_Tvw.place(relx=0.37,rely=0.05, relwidth=0.32,relheight=0.40)
+    Product_Tvw.column(1, width=10)
+    Product_Tvw.column(2, width=180)
+    Product_Tvw.column(3, width=20)
+    Product_Tvw.heading(1, text = 'ID')
+    Product_Tvw.heading(2, text = 'Producto')
+    Product_Tvw.heading(3, text = 'Peso')
+    Product_Tvw.bind('<Double 1>',lambda x: getrow(x, 'Product'))
+
+    Frame_buttons4 = Frame(Frame_Product)
+    Frame_buttons4.config(bg = '#E9967A')
+    Frame_buttons4.place(relx = 0.75, rely = 0.01, relwidth = 0.15, relheight = 0.05)
+
+    plus_button4 = Button(Frame_buttons4, text= '+', fg= 'green', command= lambda: Add_Item_window('Variación', True, False, True))
+    plus_button4.pack(side = LEFT, padx = 2)
+    minus_button4 = Button(Frame_buttons4, text= '-', fg= 'red', command= lambda: Delete_Item('Variation'))
+    minus_button4.pack(side = LEFT, padx = 2)
+    edit_button4 = Button(Frame_buttons4, text= 'Editar', fg= 'blue', command= lambda: Add_Item_window('Variación', False, False, True))
+    edit_button4.pack(side = LEFT, padx = 2)
+
+    Variation_Tvw = ttk.Treeview(Frame_Product, columns=(1,2,3),show='headings')
+    Variation_Tvw.place(relx=0.72,rely=0.05, relwidth=0.2,relheight=0.40)
+    Variation_Tvw.column(1, width=10)
+    Variation_Tvw.column(2, width=60)
+    Variation_Tvw.column(3, width=20)
+    Variation_Tvw.heading(1, text = 'ID')
+    Variation_Tvw.heading(2, text = 'Variación')
+    Variation_Tvw.heading(3, text = 'Precio')
+    Variation_Tvw.bind('<Double 1>',lambda x: Search(x,Variation_Tvw.item(Variation_Tvw.focus())['values'][0], False))
+    fill_variation_query_string = f"""
+        SELECT Var.ID, 
+            Dep.Description,
+            Cat.Description,
+            Prod.Description,
+            Var.Description,
+            Var.Price	
+        FROM
+        Variations as Var
+        JOIN Departments  as Dep
+        ON Dep.ID = Var.DepartmentID
+        JOIN Categories as Cat 
+        ON Cat.ID = Var.CatID
+        JOIN Products as Prod
+        ON Prod.ID = Var.ProductID
+    """
+
+    Items_Tvw = ttk.Treeview(Frame_Product, columns=(1,2,3,4,5,6),show='headings')
+    Items_Tvw.place(relx=0.1,rely=0.50, relwidth=0.82,relheight=0.3)
+    Items_Tvw.column(1, width=25)
+    Items_Tvw.column(2, width=80)
+    Items_Tvw.column(3, width=80)
+    Items_Tvw.column(4, width=180)
+    Items_Tvw.column(5, width=80)
+    Items_Tvw.column(6, width=80)
+    Items_Tvw.heading(1, text = 'ID')
+    Items_Tvw.heading(2, text = 'Departamento')
+    Items_Tvw.heading(3, text = 'Categoría')
+    Items_Tvw.heading(4, text = 'Producto')
+    Items_Tvw.heading(5, text = 'Variación')
+    Items_Tvw.heading(6, text = 'Precio')
+    Items_Tvw.bind('<Double 1>',lambda x: General(Items_Tvw.item(Items_Tvw.focus())['values'][0]))
+
+    for row in db.query(fill_variation_query_string):
+        try:
+            Items_Tvw.insert("",END, values = row)
+        except:
+            messagebox.showerror('Error', 'Error al cargar la tabla de variaciones')
+
+
+    ### FRAME BUSCAR PRODUCTOS Y SU VARIACIONES
+
+    Frame_buscar_productos = Frame(Frame_Product)
+    Frame_buscar_productos.config(bg = '#E9907A')
+    Frame_buscar_productos.place(relx = 0.1, rely = 0.82, relwidth = 0.82, relheight = 0.07)
     
-    ### ENVOLTURAS PARA LA SECCIÓN 3:
-    Envoltura_Buscar = LabelFrame(Frame_Seccion3, text='  BUSCADOR  ')
-    Envoltura_Buscar.config(bg = '#E9967A')
-    Envoltura_Buscar.place(relx=0.05, y=0, relwidth=0.90,relheight=0.075)
-
-    Envoltura_Modificar = LabelFrame(Frame_Seccion3, text='  AGREGAR O MODIFICAR EXISTENTES  ')
-    Envoltura_Modificar.config(bg = '#E9967A')
-    Envoltura_Modificar.place(relx=0.05, rely=0.1, relwidth=0.90,relheight=0.30)
-
     ##ETIQUETAS
-    lblsearch= Label(Envoltura_Buscar, text = 'Ingrese:')
+    lblsearch= Label(Frame_buscar_productos, text = 'Buscar:')
     lblsearch.config(bg = '#E9967A', font = 'Arial 14 bold')
     lblsearch.grid(row=0, column=0, padx=10)
-
-    lblName = Label(Envoltura_Modificar, text = 'Nombre:')
-    lblName.config(bg='#E9967A', font = 'Arial 14 bold')
-    lblName.grid(row=0, column=0,padx=10)
-
-    lblID = Label(Envoltura_Modificar, text = "ID Producto:")
-    lblID.config(bg='#E9967A', font = 'Arial 14 bold')
-    lblID.grid(row=1, column=0,padx=10)
-
-    lblPrice = Label(Envoltura_Modificar, text = 'Precio:')
-    lblPrice.config(bg='#E9967A', font = 'Arial 14 bold')
-    lblPrice.grid(row=2, column=0,padx=10)
-
-    ##ENTRADAS
-    query = StringVar()
-    p_id = IntVar()
-    p_Name = StringVar()
-    p_Price = IntVar()
     
-    Entsearch = Entry(Envoltura_Buscar, textvariable = query)
-    Entsearch.config(justify = 'center',width=70)
-    Entsearch.grid(row=0, column=1)
+    Entsearch = Entry(Frame_buscar_productos)
+    Entsearch.config(justify = 'center',width=55)
+    Entsearch.grid(row=0, column=1, padx=10)
+    Entsearch.bind('<Return>', lambda x: Search(x,Entsearch.get(), True))
     
-    #EntName = Entry(Frame_Product, textvariable = p_Name)
-    EntName = Entry(Envoltura_Modificar, textvariable=p_Name)
-    EntName.config(justify = 'center',width=50)
-    EntName.grid(row=0, column=1)
-
-    EntID = Entry(Envoltura_Modificar, textvariable = p_id)
-    EntID.config(justify = 'center',width=50)
-    EntID.grid(row=1, column=1)
-
-    EntPrice = Entry(Envoltura_Modificar, textvariable = p_Price)
-    EntPrice.config(justify = 'center',width=50)
-    EntPrice.grid(row=2, column=1)
     
     ##BOTONES
 
-    Botsearch = Button(Envoltura_Buscar,text = '   Buscar   ' ,command = lambda : Search_Product(Section.get()))
+    Botsearch = Button(Frame_buscar_productos,text = '   Buscar   ' ,command = lambda: Search(None,Entsearch.get(), True))
     Botsearch.grid(row=0, column=2,padx=10)
 
-    Botclear = Button(Envoltura_Buscar, text = '  Limpiar  ', command = lambda : Clear_Product(Section.get()))
+    Botclear = Button(Frame_buscar_productos, text = '  Limpiar  ', command = lambda: update_treeview(Items_Tvw, db.query(fill_variation_query_string),clean_lvl=3))
     Botclear.grid(row=0, column=3,padx=10)
-
-    Frame_Botones_modificar = Frame(Envoltura_Modificar)
-    Frame_Botones_modificar.config(bg = '#E9967A')
-    Frame_Botones_modificar.grid(row=3, column=0, columnspan=2,padx=30,pady=20, sticky='nsew')
-
-    BotAdd = Button(Frame_Botones_modificar, text = '  Agregar  ', command= lambda : Add_Product(Section.get()))
-    BotAdd.grid(row=0, column=0,padx=20)
-
-    BotUpdate = Button(Frame_Botones_modificar, text = '  Actualizar  ', command = lambda : Update_Product(Section.get()))
-    BotUpdate.grid(row=0, column=1,padx=20)
-
-    BotErase = Button(Frame_Botones_modificar, text = '  Borrar  ', command = lambda : Delete_Product(Section.get()))
-    BotErase.grid(row=0, column=2,padx=20)
-
-    BotClearData = Button(Frame_Botones_modificar, text = '  Limpiar  ', command = lambda: Clear(Section.get()))
-    BotClearData.grid(row=0, column=3,padx=20)
 
     ###################################################################################################
 
@@ -390,12 +786,7 @@ def Data_Window():
     Employee_items.heading(3, text = 'Apellido')
     Employee_items.heading(4, text = 'Segundo Apellido')
 
-    Employee_items.bind('<Double 1>',Get_Employee)
-
-    cursor.execute("SELECT id, NOMBRE, APELLIDO1, APELLIDO2 FROM EMPLEADOS")
-    rows_E = cursor.fetchall()
-    for i in rows_E:
-        Employee_items.insert("", END, values=i)
+    #Employee_items.bind('<Double 1>',Get_Employee)
 
     ##FRAME DE DATOS
 
@@ -508,12 +899,9 @@ def Data_Window():
     Regitems_mesas.heading(4, text = 'Producto')
     Regitems_mesas.heading(5, text = 'Costo')
     
-    Fecha = time.strftime("%d/%b/%Y") 
-    cursor.execute("SELECT * FROM REGISTRO WHERE FECHA LIKE '%"+Fecha+"%' AND COD_VENTA > 0")
-    for i in cursor.fetchall():
-        Registro_items.insert("",END,values = i)
+    Fecha = time.strftime("%d/%b/%Y") #Fecha actual
 
-    Registro_items.bind('<Double 1>',Get_Registro)
+    #Registro_items.bind('<Double 1>',Get_Registro)
 
     ###FRAME LABEL
     EnvolutrainteractReg = LabelFrame(Frame_registro, text = 'Opciones')
@@ -540,3 +928,8 @@ def Data_Window():
 
     Frame_registro.tkraise()
     DataWn.protocol("WM_DELETE_WINDOW", on_closing)
+
+
+if __name__ == '__main__':
+    Data_Window()
+    print("Hola")

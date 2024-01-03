@@ -1,5 +1,5 @@
 from email import message
-from fileinput import filename
+#from fileinput import filename
 from tkinter import *
 from tkinter import ttk
 import time
@@ -11,7 +11,7 @@ from DataManager import Data_Window
 from urllib.parse import urlencode
 import requests
 from openpyxl import load_workbook
-#import urllib.parse
+from PIL import ImageTk, Image
 
 with sqlite3.connect("Base_de_Datos/DataBase.db") as db:
     cursor = db.cursor()
@@ -28,10 +28,10 @@ Tickets = []
 
 #+++++++++++++++++++++++++++++FUNCIONES++++++++++++++++++++++++++++++#
 
-def Display_Time():
-    now = time.strftime("Fecha: %d/%b/%Y, Hora: %H:%M:%S")
-    Reloj_Eti['text'] = now
-    window.after(1000,Display_Time)
+# def Display_Time():
+#     now = time.strftime("Fecha: %d/%b/%Y, Hora: %H:%M:%S")
+#     Reloj_Eti['text'] = now
+#     window.after(1000,Display_Time)
 
 def Generador_de_Secciones():
     del Cocteles[:], Platillos[:], Caldos[:],Pescados[:], Bebidas[:], Postres[:], Meseros[:]
@@ -618,10 +618,10 @@ def Borrar_ticket(TickID):
 
 
 ###################################################################################
-
 window = Tk() #INICIALIAR VENTANA
-wx = window.winfo_screenwidth() * 0.54
-wy= window.winfo_screenheight() * 0.91
+wx = window.winfo_screenwidth() 
+wy= window.winfo_screenheight() 
+
 
 Dx = 740
 Dy = 700
@@ -635,22 +635,20 @@ ExcelLogo = PhotoImage(file = 'Images/Excel.png')
 
 
 ########################## VENTANA PRINCIPAL######################
-window.geometry('%ix%i'%(wx,wy))
-window.title('Tickets Manager Version 1.3')
+window.geometry('%ix%i'%(wx * 0.4,wy * 0.85))
+window.title('Tickets Chalo Manager V1.4')
 window.config(bg='#E9967A')
+#window.resizable(False,False)
 
 #ETIQUETAS
-
-
 Title = Label(window,text='GENERADOR DE TICKETS CHALO')
-Title.place(relx = 10/Dx,rely=5/Dy)
-Title.config(width = "43", height = '2',bd=10, relief='sunken',bg = "#F08080",
-            font="Arial 15 bold")
+Title.place(relx = 0.2,rely=0.01)
+Title.config(width = '42', height = '2',bd=10, relief='sunken',bg = "#F08080", font="Arial 15 bold")
 
-Reloj_Eti = Label(window)
-Reloj_Eti.place(relx = 0.337, rely = 0.085)
-Reloj_Eti.config(bd=5, relief='sunken', bg='#E9967A', fg="white")
-Display_Time()
+#Reloj_Eti = Label(window)
+#Reloj_Eti.place(relx = 0.337, rely = 0.085)
+#Reloj_Eti.config(bd=5, relief='sunken', bg='#E9967A', fg="white")
+#Display_Time()
 
 LogoLabel = Label(image=Logo)
 LogoLabel.place(relx= (330/Dx) ,rely=(95/Dy))
@@ -660,9 +658,9 @@ Etiqueta2 = Label(window,text= 'PAGA CON: $')
 Etiqueta2.config(bg='#E9967A',font='Arial 11 bold')
 Etiqueta2.place(relx=485/Dx,rely=155/Dy)
 
-Etiqueta3 = Label(window, text= 'Base de datos')
+Etiqueta3 = Label(window, text= 'Registros')
 Etiqueta3.config(bg='#E9967A',font='Arial 8 bold')
-Etiqueta3.place(relx=530/Dx,rely=75/Dy)
+Etiqueta3.place(relx=545/Dx,rely=75/Dy)
 
 #Etiqueta4 = Label(window, text = 'Conectar')
 #Etiqueta4.config(bg='#E9967A',font='Arial 12 bold')
@@ -707,7 +705,7 @@ Fact_ver.place(relx = 640/Dx, rely = 200/Dy)
 
 #BOTONES
 Generar_Boton = Button(window, text = "Generar Ticket", command = Generar_Ticket)
-Generar_Boton.config(bg='#E9967A',font='Arial 10 bold',fg = 'Green')
+Generar_Boton.config(bg='#b2f2bb',font='Arial 10 bold')
 Generar_Boton.place(relx=180/Dx,rely=660/Dy, width = 120, height = 25 )
 
 Cobrar_Boton = Button(window, text = '  Cobrar  ', command = Cobrar_ticket)
